@@ -9,10 +9,8 @@ import atexit
 import sys
 import socket
 import shutil
-# Todo:
-# Add mysql nmap-script
-# Change replace to sed:
-# sed 's|literal_pattern|replacement_string|g'
+import requests
+from requests.exceptions import ConnectionError
 
 start = time.time()
 
@@ -63,8 +61,27 @@ def connect_to_port(ip_address, port, service):
         write_to_file(ip_address, "pop3-connect", total_communication)
     s.close()
 
-
-
+def Write_to_file_search_text(enum_type):
+    searchText = 'TestText'
+    if enum_type == "portscan":
+        searchText = "INSERTTCPSCAN"
+    elif enum_type == "dirb":
+        searchText = "INSERTDIRBSCAN"
+    elif enum_type == "nikto":
+        searchText = "INSERTNIKTOSCAN"
+    elif enum_type == "ftp-connect":
+        searchText = "INSERTFTPTEST"
+    elif enum_type == "smtp-connect":
+        searchText = "INSERTSMTPCONNECT"
+    elif enum_type == "ssh-connect":
+        searchText = "INSERTSSHCONNECT"
+    elif enum_type == "pop3-connect":
+        searchText = "INSERTPOP3CONNECT"
+    elif enum_type == "curl":
+        searchText = "INSERTCURLHEADER"
+    else:
+        print "Text to replace in file is invalid"
+    return searchText
 
 def write_to_file(ip_address, enum_type, data):
 
@@ -72,26 +89,15 @@ def write_to_file(ip_address, enum_type, data):
     file_path_windows = '/root/oscp/exam/%s/mapping-windows.md' % (ip_address)
     paths = [file_path_linux, file_path_windows]
     print bcolors.OKGREEN + "INFO: Writing " + enum_type + " to template files:\n " + file_path_linux + "   \n" + file_path_windows + bcolors.ENDC
-
+    TextToFind = Write_to_file_search_text(enum_type)
     for path in paths:
-        if enum_type == "portscan":
-            subprocess.check_output("replace INSERTTCPSCAN \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "dirb":
-            subprocess.check_output("replace INSERTDIRBSCAN \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "nikto":
-            subprocess.check_output("replace INSERTNIKTOSCAN \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "ftp-connect":
-            subprocess.check_output("replace INSERTFTPTEST \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "smtp-connect":
-            subprocess.check_output("replace INSERTSMTPCONNECT \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "ssh-connect":
-            subprocess.check_output("replace INSERTSSHCONNECT \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "pop3-connect":
-            subprocess.check_output("replace INSERTPOP3CONNECT \"" + data + "\"  -- " + path, shell=True)
-        if enum_type == "curl":
-            subprocess.check_output("replace INSERTCURLHEADER \"" + data + "\"  -- " + path, shell=True)
+        try:
+            for line in fileinput.FileInput(path,inplace=1):
+                line = line.replace(TextToFind,data)
+                sys.stdout.write(line)
+        except:
+            print "Error Writing to " + path
     return
-
 
 
 def dirb(ip_address, port, url_start):
@@ -123,14 +129,18 @@ def httpEnum(ip_address, port):
     dirb_process.start()
     nikto_process = multiprocessing.Process(target=nikto, args=(ip_address,port,"http"))
     nikto_process.start()
-
-    CURLSCAN = "curl -I http://%s" % (ip_address)
-    print bcolors.HEADER + CURLSCAN + bcolors.ENDC
-    curl_results = subprocess.check_output(CURLSCAN, shell=True)
+    url = "http://" + ip_address
+    try:
+        CURLSCAN = requests.get(url)
+        print CURLSCAN.url + " " + " with Status Code: " + str(CURLSCAN.status_code)
+        for key in CURLSCAN.headers:
+            print key + " : " + CURLSCAN.headers[key]
+    except ConnectionError:
+        print 'Failed to open url, ' + url
     write_to_file(ip_address, "curl", curl_results)
+
     HTTPSCAN = "nmap -sV -Pn -vv -p %s --script=http-vhosts,http-userdir-enum,http-apache-negotiation,http-backup-finder,http-config-backup,http-default-accounts,http-methods,http-method-tamper,http-passwd,http-robots.txt,http-devframework,http-enum,http-frontpage-login,http-git,http-iis-webdav-vuln,http-php-version,http-robots.txt,http-shellshock,http-vuln-cve2015-1635 -oN /root/oscp/exam/%s/%s_http.nmap %s" % (port, ip_address, ip_address, ip_address)
     print bcolors.HEADER + HTTPSCAN + bcolors.ENDC
-
     http_results = subprocess.check_output(HTTPSCAN, shell=True)
     print bcolors.OKGREEN + "INFO: RESULT BELOW - Finished with HTTP-SCAN for " + ip_address + bcolors.ENDC
     print http_results
