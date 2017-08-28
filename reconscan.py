@@ -99,13 +99,27 @@ def write_to_file(ip_address, enum_type, data):
             print "Error Writing to " + path
     return
 
+def updateStatus(scan_type, ip_address, status):
+    file_path = '/root/oscp/exam/%s/Status.txt' % (ip_address)
+    replace_Text = scan_type + " : " + status
+    for line in fileinput.FileInput(file_path, inplace=1):
+        lineList = line.split()
+        line = line.replace(scan_type, replace_Text)
+        sys.stdout.write(line)
+
+    for line in fileinput.FileInput(file_path):
+        current_status = line.split(":")
+        if len(current_status) > 2 :
+            print line
 
 def dirb(ip_address, port, url_start):
     print bcolors.HEADER + "INFO: Starting dirb scan for " + ip_address + bcolors.ENDC
-    DIRBSCAN = "dirb %s://%s:%s -o /root/oscp/exam/%s/dirb-%s.txt -r" % (url_start, ip_address, port, ip_address, ip_address)
+    DIRBSCAN = "dirb %s://%s:%s -w -o /root/oscp/exam/%s/dirb-%s.txt -r" % (url_start, ip_address, port, ip_address, ip_address)
     print bcolors.HEADER + DIRBSCAN + bcolors.ENDC
+    updateStatus("Dirb", ip_address, "Running")
     results_dirb = subprocess.check_output(DIRBSCAN, shell=True)
     print bcolors.OKGREEN + "INFO: RESULT BELOW - Finished with dirb scan for " + ip_address + bcolors.ENDC
+    updateStatus("Dirb", ip_address, "Done")
     print results_dirb
     write_to_file(ip_address, "dirb", results_dirb)
     return
@@ -114,7 +128,9 @@ def nikto(ip_address, port, url_start):
     print bcolors.HEADER + "INFO: Starting nikto scan for " + ip_address + bcolors.ENDC
     NIKTOSCAN = "nikto -h %s://%s -o /root/oscp/exam/%s/nikto-%s-%s.txt" % (url_start, ip_address, ip_address, url_start, ip_address)
     print bcolors.HEADER + NIKTOSCAN + bcolors.ENDC
+    updateStatus("Nikto", ip_address, "Running")
     results_nikto = subprocess.check_output(NIKTOSCAN, shell=True)
+    updateStatus("Nikto", ip_address, "Done")
     print bcolors.OKGREEN + "INFO: RESULT BELOW - Finished with NIKTO-scan for " + ip_address + bcolors.ENDC
     print results_nikto
     write_to_file(ip_address, "nikto", results_nikto)
@@ -238,25 +254,19 @@ def pop3Scan(ip_address, port):
     connect_to_port(ip_address, port, "pop3")
 
 def snmpEnum(ip_address, port):
-    SNMPUSERS = "snmpwalk -c public -v1 " + ip_address + " 1.3.6.1.4.1.77.1.2.25" + " > /root/oscp/exam/" + ip_address +"/snmpusers.txt"
-    SNMPPROCS = "snmpwalk -c public -v1 " + ip_address + " 1.3.6.1.2.1.25.4.2.1.2" + " > /root/oscp/exam/" + ip_address +"/snmpprocss.txt"
-    SNMPSOFTWARE = "snmpwalk -c public -v1 " + ip_address + " 1.3.6.1.2.1.25.6.3.1.2" + " > /root/oscp/exam/" + ip_address +"/snmpsoftware.txt"
-    SNMPTCP = "snmpwalk -c public -v1 " + ip_address + " 1.3.6.1.2.1.6.13.1.3" + " > /root/oscp/exam/" + ip_address +"/snmptcp.txt"
-    SNMPUDP = "snmpwalk -c public -v1" + ip_address + " 1.3.6.1.2.1.7.5.1.2" + " > /root/oscp/exam/" + ip_address +"/snmpudp.txt"
-    subprocess.check_output(SNMPUSERS, shell=True)
-    subprocess.check_output(SNMPPROCS, shell=True)
-    subprocess.check_output(SNMPSOFTWARE, shell=True)
-    subprocess.check_output(SNMPTCP, shell=True)
-    subprocess.check_output(SNMPUDP, shell=True)
+    SNMPCHECK = "snmp-check %s > /root/oscp/exam/%s/snmpcheck.txt" % (ip_address, ip_address)
+    subprocess.check_output(SNMPCHECK, shell=True)
 
 def nmapScan(ip_address):
     ip_address = ip_address.strip()
     print bcolors.OKGREEN + "INFO: Running general TCP/UDP nmap scans for " + ip_address + bcolors.ENDC
 
 
-    TCPSCAN = "nmap -sV -O %s -oN '/root/oscp/exam/%s/%s.nmap'"  % (ip_address, ip_address, ip_address)
+    TCPSCAN = "nmap -O -Pn -sS -sV -sU -p T:1-65535,U:53,67-69,111,123,135,137-139,161-162,445,500,514,520,631,996-999,1434,1701,1900,3283,4500,5353,49152-49154 %s -oN '/root/oscp/exam/%s/%s.nmap'"  % (ip_address, ip_address, ip_address)
     print bcolors.HEADER + TCPSCAN + bcolors.ENDC
+    updateStatus("TCPNmap", ip_address, "Running")
     results = subprocess.check_output(TCPSCAN, shell=True)
+    updateStatus("TCPNmap", ip_address, "Done")
     print bcolors.OKGREEN + "INFO: RESULT BELOW - Finished with BASIC Nmap-scan for " + ip_address + bcolors.ENDC
     print results
 
@@ -319,15 +329,10 @@ def nmapScan(ip_address):
             for port in ports:
                 port = port.split("/")[0]
                 multProc(sshScan, ip_address, port)
-        elif "snmp" in serv:
+        elif "snmp" in serv: # this isn't going to run logic flaw needs to be fixed
             for port in ports:
                 port = port.split("/")[0]
                 multProc(snmpEnum, ip_address, port)
-  #     elif ("domain" in serv):
-    #  for port in ports:
-     #    port = port.split("/")[0]
-     #    multProc(dnsEnum, ip_address, port)
-
     return
 
 
@@ -370,9 +375,10 @@ if __name__=='__main__':
             print bcolors.OKGREEN + "INFO: Folder created here: " + "/root/oscp/exam/" + scanip + bcolors.ENDC
             shutil.copy(("/root/oscp/reports/windows-template.md"), ("/root/oscp/exam/" + scanip + "/mapping-windows.md"))
             shutil.copy(("/root/oscp/reports/linux-template.md"), ("/root/oscp/exam/" + scanip + "/mapping-linux.md"))
+            shutil.copy(("/root/oscp/reports/Status.txt"), ("/root/oscp/exam/" + scanip + "/Status.txt"))
             print bcolors.OKGREEN + "INFO: Added pentesting templates: " + "/root/oscp/exam/" + scanip + bcolors.ENDC
             subprocess.check_output("sed -i -e 's/INSERTIPADDRESS/" + scanip + "/g' /root/oscp/exam/" + scanip + "/mapping-windows.md", shell=True)
             subprocess.check_output("sed -i -e 's/INSERTIPADDRESS/" + scanip + "/g' /root/oscp/exam/" + scanip + "/mapping-linux.md", shell=True)
-
+            #subprocess.check_output("sed -i -e 's/INSERTIP/" + scanip + "/g' /root/oscp/exam/" + scanip + "/Status.txt", shell=True)
         p = multiprocessing.Process(target=nmapScan, args=(scanip,))
         p.start()
