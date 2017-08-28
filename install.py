@@ -11,6 +11,7 @@ except:
 
 shutil.copy(("./windows-template.md"),("/root/oscp/reports/windows-template.md"))
 shutil.copy(("./linux-template.md"), ("/root/oscp/reports/linux-template.md"))
+shutil.copy(("./Status.txt"), ("/root/oscp/reports/Status.txt"))
 print "Copied linux and windows template files into working Directory"
 shutil.copy(("./reconscan.py"), ("/root/oscp/reconscan.py"))
 print "Copied reconscan.py into working directory!"
