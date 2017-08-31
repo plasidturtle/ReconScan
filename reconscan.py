@@ -262,7 +262,7 @@ def nmapScan(ip_address):
     print bcolors.OKGREEN + "INFO: Running general TCP/UDP nmap scans for " + ip_address + bcolors.ENDC
 
 
-    TCPSCAN = "nmap -O -Pn -sS -sV -sU -p T:1-65535,U:53,67-69,111,123,135,137-139,161-162 %s -oN '/root/oscp/exam/%s/%s.nmap'"  % (ip_address, ip_address, ip_address)
+    TCPSCAN = "nmap -sV -O -T5 %s -oN '/root/oscp/exam/%s/%s.nmap'"  % (ip_address, ip_address, ip_address)
     print bcolors.HEADER + TCPSCAN + bcolors.ENDC
     updateStatus("TCPNmap", ip_address, "Running")
     results = subprocess.check_output(TCPSCAN, shell=True)
